@@ -1,0 +1,23 @@
+*.iml
+.DS_Store
+
+# Local machine / editor state
+.idea/
+.gradle/
+.kotlin/
+.trae/
+local.properties
+
+# Gradle / Android build outputs
+build/
+**/build/
+captures/
+.cxx/
+.externalNativeBuild/
+
+# Signing artifacts
+*.jks
+*.keystore
+*.pem
+/keystore/release-keystore-info.txt
+/keystore/keystore.properties

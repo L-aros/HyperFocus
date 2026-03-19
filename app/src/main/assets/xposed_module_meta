@@ -1,0 +1,12 @@
+{
+  "name": "HyperFocus",
+  "description": "移除澎湃OS焦点通知白名单",
+  "package": "com.laros.hyperfocus",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "minApi": 35,
+  "maxApi": 36,
+  "scope": [
+    "com.android.systemui"
+  ]
+}

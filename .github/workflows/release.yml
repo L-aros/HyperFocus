@@ -1,0 +1,100 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  build_release:
+    runs-on: ubuntu-latest
+    env:
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Decode keystore
+        run: |
+          [ -n "${{ secrets.KEYSTORE_BASE64 }}" ] || { echo "::error::Missing secret KEYSTORE_BASE64"; exit 1; }
+          [ -n "${{ secrets.KEYSTORE_PASSWORD }}" ] || { echo "::error::Missing secret KEYSTORE_PASSWORD"; exit 1; }
+          [ -n "${{ secrets.KEY_ALIAS }}" ] || { echo "::error::Missing secret KEY_ALIAS"; exit 1; }
+          [ -n "${{ secrets.KEY_PASSWORD }}" ] || { echo "::error::Missing secret KEY_PASSWORD"; exit 1; }
+          mkdir -p keystore
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore/hyperfocus-release.jks
+          test -s keystore/hyperfocus-release.jks
+
+      - name: Create keystore properties
+        run: |
+          cat > keystore/keystore.properties <<EOF
+          storeFile=keystore/hyperfocus-release.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+          test -s keystore/keystore.properties
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build release
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          ./gradlew :app:assembleRelease -PVERSION_NAME="${version}" -PVERSION_CODE="${GITHUB_RUN_NUMBER}"
+
+      - name: Standardize APK names
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+
+          shopt -s nullglob
+          for apk in app/build/outputs/apk/release/*.apk; do
+            cp "$apk" "dist/HyperFocus-v${version}-release.apk"
+          done
+
+          test -n "$(ls -A dist)"
+
+      - name: Prepare release notes
+        run: |
+          version="${GITHUB_REF_NAME}"
+          out="dist/release_notes.md"
+
+          git tag -l --format='%(contents)' "$version" > "$out"
+
+          if [ ! -s "$out" ]; then
+            {
+              echo "# ${version}"
+              echo
+              echo "## Changelog"
+              echo
+              git log -20 --pretty=format:'- %s (%h)'
+              echo
+            } > "$out"
+          fi
+
+          test -s "$out"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          body_path: dist/release_notes.md
+          files: |
+            dist/*.apk
