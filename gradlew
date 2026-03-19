@@ -11,7 +11,7 @@ else
   JAVA_CMD="java"
 fi
 
-exec "$JAVA_CMD" $JAVA_OPTS $GRADLE_OPTS \
+exec "$JAVA_CMD" ${JAVA_OPTS:-} ${GRADLE_OPTS:-} \
   -Dorg.gradle.appname=gradlew \
   -classpath "$CLASSPATH" \
   org.gradle.wrapper.GradleWrapperMain "$@"
